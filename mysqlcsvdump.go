@@ -9,7 +9,12 @@ import (
   _ "github.com/go-sql-driver/mysql"
 )
 
-func dump(tables []string, db *sql.DB, outputDir string) error {
+// Queryable interface that matches sql.DB and sql.Tx.
+type queryable interface {
+  Query(query string, args ...interface{}) (*sql.Rows, error)
+}
+
+func dump(tables []string, db queryable, outputDir string) error {
   for _, table := range tables {
     err := dumpTable(table, db, outputDir)
     if err != nil {
@@ -19,7 +24,7 @@ func dump(tables []string, db *sql.DB, outputDir string) error {
   return nil
 }
 
-func dumpTable(table string, db *sql.DB, outputDir string) error {
+func dumpTable(table string, db queryable, outputDir string) error {
   f, err := os.Create(outputDir + "/" + table + ".csv")
   if err != nil {
     return err
@@ -82,7 +87,7 @@ func dumpTable(table string, db *sql.DB, outputDir string) error {
   return nil
 }
 
-func getTables(db *sql.DB) ([]string, error) {
+func getTables(db queryable) ([]string, error) {
   tables := make([]string, 0, 10)
   rows, err := db.Query("SHOW TABLES")
   if err != nil {
@@ -107,6 +112,7 @@ func main() {
   //csvEscape := flag.String("fields-escaped-by", "\\", "character to escape special characters with")
   //compressCon := flag.Bool("compress-con", false, "whether compress connection or not")
   //compressFiles := flag.Bool("compress-file", false, "whether compress connection or not")
+  useTransaction := flag.Bool("single-transaction", true, "whether to wrap everything in a transaction or not.")
 
   flag.Parse()
   args := flag.Args()
@@ -125,20 +131,26 @@ func main() {
   }
   defer db.Close()
 
-  tx, err := db.Begin()
-  if err != nil {
-    panic(err)
+  var q queryable
+  if *useTransaction {
+    tx, err := db.Begin()
+    if err != nil {
+      panic(err)
+    }
+    defer tx.Rollback()
+    q = tx
+  } else {
+    q = db
   }
-  defer tx.Rollback()
 
   var tables []string
   if len(args) > 1 {
     tables = args[1:]
   } else {
-    tables, err = getTables(db)
+    tables, err = getTables(q)
   }
 
-  err = dump(tables, db, *outputDir)
+  err = dump(tables, q, *outputDir)
   if err != nil {
     panic(err)
   }
