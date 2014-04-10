@@ -16,9 +16,9 @@ type queryable interface {
   Query(query string, args ...interface{}) (*sql.Rows, error)
 }
 
-func dump(tables []string, db queryable, outputDir string, compressOut bool) error {
+func dump(tables []string, db queryable, outputDir string, compressOut bool, skipHeader bool) error {
   for _, table := range tables {
-    err := dumpTable(table, db, outputDir, compressOut)
+    err := dumpTable(table, db, outputDir, compressOut, skipHeader)
     if err != nil {
       fmt.Printf("Error dumping %s: %s\n", table, err)
     }
@@ -26,7 +26,7 @@ func dump(tables []string, db queryable, outputDir string, compressOut bool) err
   return nil
 }
 
-func dumpTable(table string, db queryable, outputDir string, compressOut bool) error {
+func dumpTable(table string, db queryable, outputDir string, compressOut bool, skipHeader bool) error {
   fname := outputDir + "/" + table + ".csv"
   if compressOut {
     fname = fname + ".gz"
@@ -58,9 +58,11 @@ func dumpTable(table string, db queryable, outputDir string, compressOut bool) e
   if err != nil {
     panic(err.Error())
   }
-  err = w.Write(columns)   // Header
-  if err != nil {
-    return err
+  if (!skipHeader) {
+    err = w.Write(columns)   // Header
+    if err != nil {
+      return err
+    }
   }
 
   for rows.Next() {
@@ -129,6 +131,7 @@ func main() {
   //compressCon := flag.Bool("compress-con", false, "whether compress connection or not")
   compressFiles := flag.Bool("compress-file", false, "whether compress connection or not")
   useTransaction := flag.Bool("single-transaction", true, "whether to wrap everything in a transaction or not.")
+  skipHeader := flag.Bool("skip-header", false, "whether column header should be included or not")
 
   flag.Parse()
   args := flag.Args()
@@ -166,7 +169,7 @@ func main() {
     tables, err = getTables(q)
   }
 
-  err = dump(tables, q, *outputDir, *compressFiles)
+  err = dump(tables, q, *outputDir, *compressFiles, *skipHeader)
   if err != nil {
     panic(err)
   }
