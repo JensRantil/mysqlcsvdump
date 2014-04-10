@@ -1,10 +1,12 @@
 package main
 
 import (
+  "compress/gzip"
   "database/sql"
   "encoding/csv"
   "flag"
   "fmt"
+  "io"
   "os"
   _ "github.com/go-sql-driver/mysql"
 )
@@ -14,9 +16,9 @@ type queryable interface {
   Query(query string, args ...interface{}) (*sql.Rows, error)
 }
 
-func dump(tables []string, db queryable, outputDir string) error {
+func dump(tables []string, db queryable, outputDir string, compressOut bool) error {
   for _, table := range tables {
-    err := dumpTable(table, db, outputDir)
+    err := dumpTable(table, db, outputDir, compressOut)
     if err != nil {
       fmt.Printf("Error dumping %s: %s\n", table, err)
     }
@@ -24,14 +26,28 @@ func dump(tables []string, db queryable, outputDir string) error {
   return nil
 }
 
-func dumpTable(table string, db queryable, outputDir string) error {
-  f, err := os.Create(outputDir + "/" + table + ".csv")
+func dumpTable(table string, db queryable, outputDir string, compressOut bool) error {
+  fname := outputDir + "/" + table + ".csv"
+  if compressOut {
+    fname = fname + ".gz"
+  }
+
+  f, err := os.Create(fname)
   if err != nil {
     return err
   }
   defer f.Close()
 
-  w := csv.NewWriter(f)
+  var out io.Writer
+  if compressOut {
+    gzout := gzip.NewWriter(f)
+    defer gzout.Close()
+    out = gzout
+  } else {
+    out = f
+  }
+
+  w := csv.NewWriter(out)
 
   rows, err := db.Query("SELECT * FROM " + table)   // Couldn't get placeholder expansion to work here
   if err != nil {
@@ -111,7 +127,7 @@ func main() {
   //csvOptEncloser := flag.String("fields-optionally-enclosed-by", "\"", "character to enclose fields with when needed")
   //csvEscape := flag.String("fields-escaped-by", "\\", "character to escape special characters with")
   //compressCon := flag.Bool("compress-con", false, "whether compress connection or not")
-  //compressFiles := flag.Bool("compress-file", false, "whether compress connection or not")
+  compressFiles := flag.Bool("compress-file", false, "whether compress connection or not")
   useTransaction := flag.Bool("single-transaction", true, "whether to wrap everything in a transaction or not.")
 
   flag.Parse()
@@ -150,7 +166,7 @@ func main() {
     tables, err = getTables(q)
   }
 
-  err = dump(tables, q, *outputDir)
+  err = dump(tables, q, *outputDir, *compressFiles)
   if err != nil {
     panic(err)
   }
