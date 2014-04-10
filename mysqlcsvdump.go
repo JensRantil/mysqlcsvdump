@@ -1,12 +1,12 @@
 package main
 
 import (
-  "encoding/csv"
   "database/sql"
-  _ "github.com/go-sql-driver/mysql"
+  "encoding/csv"
   "flag"
-  "os"
   "fmt"
+  "os"
+  _ "github.com/go-sql-driver/mysql"
 )
 
 func dump(tables []string, db *sql.DB, outputDir string) error {
