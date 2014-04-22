@@ -3,12 +3,14 @@ package main
 import (
 	"compress/gzip"
 	"database/sql"
-	"encoding/csv"
 	"flag"
 	"fmt"
+	csv "github.com/JensRantil/go-csv"
 	_ "github.com/go-sql-driver/mysql"
 	"io"
 	"os"
+	"strings"
+	"unicode/utf8"
 )
 
 // Queryable interface that matches sql.DB and sql.Tx.
@@ -25,6 +27,10 @@ func dump(tables []string, db queryable, outputDir string, compressOut bool, ski
 	}
 	return nil
 }
+
+var csvSep = flag.String("fields-terminated-by", "\t", "character to terminate fields by")
+var csvOptEncloser = flag.String("fields-optionally-enclosed-by", "\"", "character to enclose fields with when needed")
+var csvEscape = flag.String("fields-escaped-by", "\\", "character to escape special characters with")
 
 func dumpTable(table string, db queryable, outputDir string, compressOut, skipHeader bool) error {
 	fname := outputDir + "/" + table + ".csv"
@@ -47,7 +53,15 @@ func dumpTable(table string, db queryable, outputDir string, compressOut, skipHe
 		out = f
 	}
 
-	w := csv.NewWriter(out)
+	quoteChar, _, _ := strings.NewReader(*csvOptEncloser).ReadRune()
+	escapeChar, _, _ := strings.NewReader(*csvEscape).ReadRune()
+	dialect := csv.Dialect{
+		Delimiter:   *csvSep,
+		QuoteChar:   quoteChar,
+		EscapeChar:  escapeChar,
+		DoubleQuote: csv.NoDoubleQuote,
+	}
+	w := csv.NewDialectWriter(out, dialect)
 
 	rows, err := db.Query("SELECT * FROM " + table) // Couldn't get placeholder expansion to work here
 	if err != nil {
@@ -125,9 +139,6 @@ func main() {
 	dbHost := flag.String("hostname", "", "database host")
 	dbPort := flag.Int("port", 3306, "database port")
 	outputDir := flag.String("outdir", "", "where output will be stored")
-	//csvSep := flag.String("fields-terminated-by", "\t", "character to terminate fields by")
-	//csvOptEncloser := flag.String("fields-optionally-enclosed-by", "\"", "character to enclose fields with when needed")
-	//csvEscape := flag.String("fields-escaped-by", "\\", "character to escape special characters with")
 	//compressCon := flag.Bool("compress-con", false, "whether compress connection or not")
 	compressFiles := flag.Bool("compress-file", false, "whether compress connection or not")
 	useTransaction := flag.Bool("single-transaction", true, "whether to wrap everything in a transaction or not.")
@@ -135,6 +146,26 @@ func main() {
 
 	flag.Parse()
 	args := flag.Args()
+	if utf8.RuneCountInString(*csvOptEncloser) > 1 {
+		fmt.Println("-fields-optionally-enclosed-by can't be more than one character.")
+		flag.PrintDefaults()
+		os.Exit(1)
+	}
+	if utf8.RuneCountInString(*csvEscape) > 1 {
+		fmt.Println("-fields-escaped-by can't be more than one character.")
+		flag.PrintDefaults()
+		os.Exit(1)
+	}
+	if utf8.RuneCountInString(*csvOptEncloser) < 1 {
+		fmt.Println("-fields-optionally-enclosed-by can't be an empty string.")
+		flag.PrintDefaults()
+		os.Exit(1)
+	}
+	if utf8.RuneCountInString(*csvEscape) < 1 {
+		fmt.Println("-fields-escaped-by can't be an empty string.")
+		flag.PrintDefaults()
+		os.Exit(1)
+	}
 	if len(args) < 1 {
 		fmt.Println("Database name must be defined.")
 		flag.PrintDefaults()
