@@ -26,7 +26,7 @@ func dump(tables []string, db queryable, outputDir string, compressOut bool, ski
 	return nil
 }
 
-func dumpTable(table string, db queryable, outputDir string, compressOut bool, skipHeader bool) error {
+func dumpTable(table string, db queryable, outputDir string, compressOut, skipHeader bool) error {
 	fname := outputDir + "/" + table + ".csv"
 	if compressOut {
 		fname = fname + ".gz"
