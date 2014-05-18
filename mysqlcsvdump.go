@@ -135,6 +135,13 @@ func getTables(db queryable) ([]string, error) {
 }
 
 func main() {
+	flag.Usage = func() {
+		fmt.Fprintf(os.Stderr, "Usage: %s [options] [table#1 table#2 ... table#N]\n\n", os.Args[0])
+		fmt.Fprintln(os.Stderr, "If no tables are specified, all tables are dumped.\n")
+		fmt.Fprintln(os.Stderr, "Options:")
+		flag.PrintDefaults()
+	}
+
 	dbUser := flag.String("user", "root", "database user")
 	dbPassword := flag.String("password", "", "database password")
 	dbHost := flag.String("hostname", "", "database host")
