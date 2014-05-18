@@ -55,8 +55,9 @@ func dumpTable(table string, db queryable, outputDir string, compressOut, skipHe
 
 	quoteChar, _, _ := strings.NewReader(*csvOptEncloser).ReadRune()
 	escapeChar, _, _ := strings.NewReader(*csvEscape).ReadRune()
+	delimiterChar, _, _ := strings.NewReader(*csvSep).ReadRune()
 	dialect := csv.Dialect{
-		Delimiter:   *csvSep,
+		Delimiter:   delimiterChar,
 		QuoteChar:   quoteChar,
 		EscapeChar:  escapeChar,
 		DoubleQuote: csv.NoDoubleQuote,
