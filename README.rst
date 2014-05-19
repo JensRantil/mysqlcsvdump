@@ -1,5 +1,7 @@
 MySQL CSV dumper
 ================
+.. image:: https://secure.travis-ci.org/JensRantil/mysqlcsvdump.png?branch=master
+   :target: http://travis-ci.org/#!/JensRantil/mysqlcsvdump
 
 This is a tiny program that can be used to _remotely_ dump one, or many, MySQL
 tables to CSV format. The application was developed out of frustration that
