@@ -17,7 +17,7 @@ type queryable interface {
 	Query(query string, args ...interface{}) (*sql.Rows, error)
 }
 
-func dump(tables []string, db queryable, outputDir string, compressOut bool, skipHeader bool, csvDialect *csv.Dialect) error {
+func dump(tables []string, db queryable, outputDir string, compressOut, skipHeader bool, csvDialect *csv.Dialect) error {
 	for _, table := range tables {
 		err := dumpTable(table, db, outputDir, compressOut, skipHeader, csvDialect)
 		if err != nil {
