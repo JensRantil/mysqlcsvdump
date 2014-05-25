@@ -6,11 +6,10 @@ import (
 	"flag"
 	"fmt"
 	csv "github.com/JensRantil/go-csv"
+	"github.com/JensRantil/go-csv/dialect"
 	_ "github.com/go-sql-driver/mysql"
 	"io"
 	"os"
-	"strings"
-	"unicode/utf8"
 )
 
 // Queryable interface that matches sql.DB and sql.Tx.
@@ -18,9 +17,9 @@ type queryable interface {
 	Query(query string, args ...interface{}) (*sql.Rows, error)
 }
 
-func dump(tables []string, db queryable, outputDir string, compressOut bool, skipHeader bool) error {
+func dump(tables []string, db queryable, outputDir string, compressOut bool, skipHeader bool, csvDialect *csv.Dialect) error {
 	for _, table := range tables {
-		err := dumpTable(table, db, outputDir, compressOut, skipHeader)
+		err := dumpTable(table, db, outputDir, compressOut, skipHeader, csvDialect)
 		if err != nil {
 			fmt.Printf("Error dumping %s: %s\n", table, err)
 		}
@@ -28,11 +27,7 @@ func dump(tables []string, db queryable, outputDir string, compressOut bool, ski
 	return nil
 }
 
-var csvSep = flag.String("fields-terminated-by", "\t", "character to terminate fields by")
-var csvOptEncloser = flag.String("fields-optionally-enclosed-by", "\"", "character to enclose fields with when needed")
-var csvEscape = flag.String("fields-escaped-by", "\\", "character to escape special characters with")
-
-func dumpTable(table string, db queryable, outputDir string, compressOut, skipHeader bool) error {
+func dumpTable(table string, db queryable, outputDir string, compressOut, skipHeader bool, csvDialect *csv.Dialect) error {
 	fname := outputDir + "/" + table + ".csv"
 	if compressOut {
 		fname = fname + ".gz"
@@ -53,16 +48,7 @@ func dumpTable(table string, db queryable, outputDir string, compressOut, skipHe
 		out = f
 	}
 
-	quoteChar, _, _ := strings.NewReader(*csvOptEncloser).ReadRune()
-	escapeChar, _, _ := strings.NewReader(*csvEscape).ReadRune()
-	delimiterChar, _, _ := strings.NewReader(*csvSep).ReadRune()
-	dialect := csv.Dialect{
-		Delimiter:   delimiterChar,
-		QuoteChar:   quoteChar,
-		EscapeChar:  escapeChar,
-		DoubleQuote: csv.NoDoubleQuote,
-	}
-	w := csv.NewDialectWriter(out, dialect)
+	w := csv.NewDialectWriter(out, *csvDialect)
 
 	rows, err := db.Query("SELECT * FROM " + table) // Couldn't get placeholder expansion to work here
 	if err != nil {
@@ -135,6 +121,8 @@ func getTables(db queryable) ([]string, error) {
 }
 
 func main() {
+	dialectBuilder := dialect.FromCommandLine()
+
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage: %s [options] [table#1 table#2 ... table#N]\n\n", os.Args[0])
 		fmt.Fprintln(os.Stderr, "If no tables are specified, all tables are dumped.\n")
@@ -153,27 +141,15 @@ func main() {
 	skipHeader := flag.Bool("skip-header", false, "whether column header should be included or not")
 
 	flag.Parse()
+
+	csvDialect, err := dialectBuilder.Dialect()
+	if err != nil {
+		fmt.Println(err.Error())
+		flag.PrintDefaults()
+		os.Exit(1)
+	}
+
 	args := flag.Args()
-	if utf8.RuneCountInString(*csvOptEncloser) > 1 {
-		fmt.Println("-fields-optionally-enclosed-by can't be more than one character.")
-		flag.PrintDefaults()
-		os.Exit(1)
-	}
-	if utf8.RuneCountInString(*csvEscape) > 1 {
-		fmt.Println("-fields-escaped-by can't be more than one character.")
-		flag.PrintDefaults()
-		os.Exit(1)
-	}
-	if utf8.RuneCountInString(*csvOptEncloser) < 1 {
-		fmt.Println("-fields-optionally-enclosed-by can't be an empty string.")
-		flag.PrintDefaults()
-		os.Exit(1)
-	}
-	if utf8.RuneCountInString(*csvEscape) < 1 {
-		fmt.Println("-fields-escaped-by can't be an empty string.")
-		flag.PrintDefaults()
-		os.Exit(1)
-	}
 	if len(args) < 1 {
 		fmt.Println("Database name must be defined.")
 		flag.PrintDefaults()
@@ -208,7 +184,7 @@ func main() {
 		tables, err = getTables(q)
 	}
 
-	err = dump(tables, q, *outputDir, *compressFiles, *skipHeader)
+	err = dump(tables, q, *outputDir, *compressFiles, *skipHeader, csvDialect)
 	if err != nil {
 		panic(err)
 	}
