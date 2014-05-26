@@ -135,7 +135,6 @@ func main() {
 	dbHost := flag.String("hostname", "", "database host")
 	dbPort := flag.Int("port", 3306, "database port")
 	outputDir := flag.String("outdir", "", "where output will be stored")
-	//compressCon := flag.Bool("compress-con", false, "whether compress connection or not")
 	compressFiles := flag.Bool("compress-file", false, "whether compress connection or not")
 	useTransaction := flag.Bool("single-transaction", true, "whether to wrap everything in a transaction or not.")
 	skipHeader := flag.Bool("skip-header", false, "whether column header should be included or not")
