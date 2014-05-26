@@ -157,7 +157,6 @@ func main() {
 	dbName := args[0]
 
 	dbUrl := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s", *dbUser, *dbPassword, *dbHost, *dbPort, dbName)
-	//fmt.Println("DB url:", dbUrl)
 	db, err := sql.Open("mysql", dbUrl)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Could not connect to server: %s\n", err)
